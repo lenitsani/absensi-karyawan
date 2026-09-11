@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Absensi Karyawan</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg, #0d6efd, #4facfe);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.container {
+  width: 100%;
+  max-width: 430px;
+  background: white;
+  border-radius: 24px;
+  padding: 25px;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.header h1 {
+  margin: 0;
+  color: #0d6efd;
+  font-size: 28px;
+}
+
+.header p {
+  margin: 6px 0 0;
+  color: #777;
+}
+
+label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+select {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  font-size: 15px;
+  background: white;
+  margin-bottom: 15px;
+}
+
+.camera-box {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #111;
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 12px;
+}
+
+video,
+canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+canvas {
+  display: none;
+}
+
+.camera-status {
+  text-align: center;
+  font-size: 14px;
+  color: #777;
+  margin-bottom: 15px;
+}
+
+button {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.btn-camera {
+  background: #f1f3f5;
+  color: #333;
+}
+
+.btn-masuk {
+  background: #198754;
+  color: white;
+}
+
+.btn-pulang {
+  background: #dc3545;
+  color: white;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.location {
+  background: #f8f9fa;
+  padding: 12px;
+  border-radius: 12px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.location strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+#hasil {
+  text-align: center;
+  font-weight: bold;
+  margin-top: 18px;
+  min-height: 22px;
+}
+
+.success {
+  color: #198754;
+}
+
+.error {
+  color: #dc3545;
+}
+
+.loading {
+  color: #0d6efd;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <div class="header">
+    <h1>ABSENSI KARYAWAN</h1>
+    <p>The Udaya Resorts & Spa</p>
+  </div>
+
+  <label>Pilih Karyawan</label>
+
+  <select id="employee">
+    <option value="">-- Pilih Karyawan --</option>
+    <option value="EMP001">Andi - EMP001</option>
+    <option value="EMP002">Budi - EMP002</option>
+    <option value="EMP003">Citra - EMP003</option>
+    <option value="EMP004">Deni - EMP004</option>
+    <option value="EMP005">Eka - EMP005</option>
+  </select>
+
+  <div class="camera-box">
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="camera-status" id="cameraStatus">
+    Kamera belum diaktifkan
+  </div>
+
+  <button class="btn-camera" onclick="aktifkanKamera()">
+    📷 AKTIFKAN KAMERA
+  </button>
+
+  <button class="btn-camera" onclick="ambilFoto()">
+    📸 AMBIL FOTO
+  </button>
+
+  <div class="location">
+    <strong>📍 Lokasi</strong>
+    <span id="locationStatus">Mencari lokasi...</span>
+  </div>
+
+  <button class="btn-masuk" onclick="kirimAbsensi('MASUK')">
+    🟢 ABSEN MASUK
+  </button>
+
+  <button class="btn-pulang" onclick="kirimAbsensi('PULANG')">
+    🔴 ABSEN PULANG
+  </button>
+
+  <div id="hasil"></div>
+
+</div>
+
+<script>
+
+const SCRIPT_URL =
+"https://script.google.com/macros/s/AKfycbzaaky-2khfrv9UmWYstAKu7rlwBlsBi2Q8kKykH5OdBQWq_QdyhBTJ6sswflP7Hezq/exec";
+
+let stream = null;
+let fotoBase64 = "";
+let latitude = "";
+let longitude = "";
+let accuracy = "";
+
+
+/* =========================
+   KAMERA
+========================= */
+
+async function aktifkanKamera() {
+
+  const status = document.getElementById("cameraStatus");
+
+  try {
+
+    if (!navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia) {
+
+      status.innerHTML =
+        "Browser tidak mendukung kamera.";
+
+      return;
+    }
+
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "user"
+      },
+      audio: false
+    });
+
+    document.getElementById("video").srcObject = stream;
+
+    status.innerHTML = "✅ Kamera aktif";
+
+    status.className = "success";
+
+  } catch (error) {
+
+    console.error(error);
+
+    status.innerHTML =
+      "❌ Kamera tidak dapat diakses. Pastikan izin kamera diberikan.";
+
+    status.className = "error";
+  }
+}
+
+
+/* =========================
+   AMBIL FOTO
+========================= */
+
+function ambilFoto() {
+
+  if (!stream) {
+
+    alert("Aktifkan kamera terlebih dahulu.");
+
+    return;
+  }
+
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+
+  ctx.drawImage(
+    video,
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+  fotoBase64 = canvas.toDataURL(
+    "image/jpeg",
+    0.7
+  );
+
+  document.getElementById("cameraStatus").innerHTML =
+    "✅ Foto berhasil diambil";
+
+  document.getElementById("cameraStatus").className =
+    "success";
+}
+
+
+/* =========================
+   GPS
+========================= */
+
+function ambilLokasi() {
+
+  const status =
+    document.getElementById("locationStatus");
+
+  if (!navigator.geolocation) {
+
+    status.innerHTML =
+      "❌ GPS tidak didukung browser.";
+
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+
+    function(position) {
+
+      latitude =
+        position.coords.latitude;
+
+      longitude =
+        position.coords.longitude;
+
+      accuracy =
+        position.coords.accuracy;
+
+      status.innerHTML =
+        "✅ GPS aktif<br>" +
+        "Akurasi: " +
+        Math.round(accuracy) +
+        " meter";
+    },
+
+    function(error) {
+
+      console.error(error);
+
+      status.innerHTML =
+        "❌ Lokasi tidak dapat diakses.";
+    },
+
+    {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0
+    }
+  );
+}
+
+
+/* =========================
+   KIRIM ABSENSI
+========================= */
+
+async function kirimAbsensi(jenis) {
+
+  const employee =
+    document.getElementById("employee").value;
+
+  const hasil =
+    document.getElementById("hasil");
+
+
+  if (!employee) {
+
+    hasil.innerHTML =
+      "⚠️ Silakan pilih karyawan.";
+
+    hasil.className = "error";
+
+    return;
+  }
+
+
+  if (!fotoBase64) {
+
+    hasil.innerHTML =
+      "⚠️ Silakan ambil foto terlebih dahulu.";
+
+    hasil.className = "error";
+
+    return;
+  }
+
+
+  if (!latitude || !longitude) {
+
+    hasil.innerHTML =
+      "⚠️ Lokasi GPS belum tersedia.";
+
+    hasil.className = "error";
+
+    return;
+  }
+
+
+  hasil.innerHTML =
+    "⏳ Menyimpan absensi...";
+
+  hasil.className = "loading";
+
+
+  const data = {
+
+    nik: employee,
+
+    jenis: jenis,
+
+    foto: fotoBase64,
+
+    latitude: latitude,
+
+    longitude: longitude,
+
+    accuracy: accuracy
+  };
+
+
+  try {
+
+    await fetch(SCRIPT_URL, {
+
+      method: "POST",
+
+      mode: "no-cors",
+
+      headers: {
+        "Content-Type": "text/plain"
+      },
+
+      body: JSON.stringify(data)
+
+    });
+
+
+    hasil.innerHTML =
+      "✅ Absensi " +
+      jenis +
+      " berhasil dikirim.";
+
+    hasil.className = "success";
+
+
+  } catch (error) {
+
+    console.error(error);
+
+    hasil.innerHTML =
+      "❌ Gagal mengirim absensi.";
+
+    hasil.className = "error";
+  }
+}
+
+
+/* =========================
+   JALANKAN GPS
+========================= */
+
+window.onload = function() {
+
+  ambilLokasi();
+
+};
+
+</script>
+
+</body>
+</html>
